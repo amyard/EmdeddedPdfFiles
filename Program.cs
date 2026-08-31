@@ -21,10 +21,19 @@ using ITextParagraph = iText.Layout.Element.Paragraph;
 using ITextLink = iText.Layout.Element.Link;
 using ITextRectangle = iText.Kernel.Geom.Rectangle;
 using ITextTextAlignment = iText.Layout.Properties.TextAlignment;
+using EmdeddedPdfFiles.Models;
 
 Console.WriteLine("=== Embedded PDF Generator ===\n");
 
-string assetsFolder = "Assets";
+
+var folder = AssetsFolderType.HugeBundle;
+
+string assetsFolder = folder switch
+{
+    AssetsFolderType.Extensions => "Assets/Extensions",
+    AssetsFolderType.HugeBundle => "Assets/HugeBundle",
+    _ => throw new NotImplementedException()
+};
 
 // Create PDF using iText library
 string itextOutputPath = "EmbeddedFiles_iText.pdf";

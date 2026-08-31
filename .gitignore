@@ -447,3 +447,5 @@ myenv/*
 files
 files/
 files/*
+
+Assets/HugeBundle/**
