@@ -255,8 +255,11 @@ static void CreateEmbeddedPdfWithAspose(string assetsFolder, string outputPdfPat
         headerCell.DefaultCellTextState.FontStyle = Aspose.Pdf.Text.FontStyles.Bold;
     }
 
-    // Process and embed each file
+    // Process and embed each file via FileAttachmentAnnotation
+    // Using FileAttachmentAnnotation directly embeds the file and makes the paperclip pin clickable on the page
+    // WITHOUT duplicate embedding in pdfDoc.EmbeddedFiles.
     int fileIndex = 1;
+    var fileAnnotations = new List<(FileSpecification fileSpec, int rowIndex)>();
     
     foreach (string filePath in files)
     {
@@ -265,13 +268,13 @@ static void CreateEmbeddedPdfWithAspose(string assetsFolder, string outputPdfPat
         long fileSize = fileInfo.Length;
         string fileSizeFormatted = FormatFileSize(fileSize);
 
-        // Add file to embedded files in PDF with Zip compression
+        // Create FileSpecification with Zip compression
         FileSpecification fileSpec = new FileSpecification(filePath, fileName)
         {
             Description = $"Embedded file: {fileName}",
             Encoding = FileEncoding.Zip
         };
-        pdfDoc.EmbeddedFiles.Add(fileSpec);
+        fileAnnotations.Add((fileSpec, fileIndex));
 
         // Add row to table
         Row row = table.Rows.Add();
@@ -279,8 +282,8 @@ static void CreateEmbeddedPdfWithAspose(string assetsFolder, string outputPdfPat
         row.Cells.Add(fileName);
         row.Cells.Add(fileSizeFormatted);
         
-        // Add "📎 Attached" indicator in the status column
-        Aspose.Pdf.Cell actionCell = row.Cells.Add("📎 Attached");
+        // Add "📎 Open" text in the action column
+        Aspose.Pdf.Cell actionCell = row.Cells.Add("📎 Open");
         actionCell.DefaultCellTextState.ForegroundColor = Aspose.Pdf.Color.Blue;
 
         Console.WriteLine($"  Embedded: {fileName} ({fileSizeFormatted})");
@@ -289,11 +292,33 @@ static void CreateEmbeddedPdfWithAspose(string assetsFolder, string outputPdfPat
 
     page.Paragraphs.Add(table);
 
+    // Add clickable file attachment annotations on the page
+    // Position them in the "Open" column for each row
+    double startY = 630; // Starting Y position for first row
+    double rowHeight = 22; // Height between rows
+    double annotX = 470; // X position for annotations (Open column)
+    double annotWidth = 80; // Width of annotation area
+
+    foreach (var (fileSpec, rowIndex) in fileAnnotations)
+    {
+        double yPos = startY - ((rowIndex - 1) * rowHeight);
+        Aspose.Pdf.Rectangle annotRect = new Aspose.Pdf.Rectangle(annotX, yPos - 5, annotX + annotWidth, yPos + 10);
+
+        FileAttachmentAnnotation fileAttachment = new FileAttachmentAnnotation(page, annotRect, fileSpec)
+        {
+            Icon = FileIcon.Paperclip,
+            Color = Aspose.Pdf.Color.Blue,
+            Contents = "Click to open attachment"
+        };
+
+        page.Annotations.Add(fileAttachment);
+    }
+
     // Add spacing
     page.Paragraphs.Add(new TextFragment(" "));
 
     // Add instruction note
-    TextFragment instructionNote = new TextFragment("💡 Access files via your PDF viewer's attachment panel (View → Attachments or side panel).");
+    TextFragment instructionNote = new TextFragment("💡 Click on the paperclip icons in the 'Open' column to access files, or use your PDF viewer's attachment panel (View → Attachments).");
     instructionNote.TextState.FontSize = 10;
     instructionNote.TextState.ForegroundColor = Aspose.Pdf.Color.Blue;
     page.Paragraphs.Add(instructionNote);

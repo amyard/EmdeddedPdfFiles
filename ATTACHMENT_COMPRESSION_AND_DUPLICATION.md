@@ -120,13 +120,35 @@ pdfDoc.EmbeddedFiles.Add(fileSpec);
 
 ### 2. Choose the Attachment Strategy in Aspose
 
-Depending on your UI/UX requirements:
+#### Option A: Clickable Page Annotations with Compression (Direct Replacement for iText UI)
+To have clickable paperclip icons on the PDF page that open files on double-click **without** duplicating the attachment:
+- Embed the files directly via `FileAttachmentAnnotation(page, rect, fileSpec)` with `fileSpec.Encoding = FileEncoding.Zip`.
+- **Do not** add `pdfDoc.EmbeddedFiles.Add(fileSpec)` separately (since `FileAttachmentAnnotation` already contains and embeds the full file stream in the PDF).
+- Result: **17.04 MB** with fully functional clickable annotations!
 
-#### Option A: Document-Level Embedded Files Only (Recommended for minimum size & cleanest PDF structure)
-If users access attachments via the PDF reader's Attachment Panel (left sidebar in Adobe Acrobat):
+```csharp
+// 1. Create FileSpecification with Zip compression
+FileSpecification fileSpec = new FileSpecification(filePath, fileName)
+{
+    Description = $"Embedded file: {fileName}",
+    Encoding = FileEncoding.Zip
+};
+
+// 2. Add clickable annotation directly (embeds the stream once)
+FileAttachmentAnnotation fileAttachment = new FileAttachmentAnnotation(page, annotRect, fileSpec)
+{
+    Icon = FileIcon.Paperclip,
+    Color = Aspose.Pdf.Color.Blue,
+    Contents = "Click to open attachment"
+};
+page.Annotations.Add(fileAttachment);
+```
+
+#### Option B: Document-Level Embedded Files Only (Panel only)
+If users only need access via the PDF reader's Attachment Panel (left sidebar in Adobe Acrobat):
 - Embed files using `pdfDoc.EmbeddedFiles.Add(fileSpec)` with `FileEncoding.Zip`.
-- Do not create secondary `FileAttachmentAnnotation` instances on the page.
-- Result: **17.05 MB** (Identical to iText).
+- Do not add `FileAttachmentAnnotation` instances on the page.
+- Result: **17.05 MB**.
 
 #### Option B: Page Visual Annotations with Optimization
 If visual paperclip icons are required in the table, run `pdfDoc.OptimizeResources` before saving:
