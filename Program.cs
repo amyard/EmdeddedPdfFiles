@@ -25,27 +25,34 @@ using EmdeddedPdfFiles.Models;
 
 Console.WriteLine("=== Embedded PDF Generator ===\n");
 
-
-var folder = AssetsFolderType.HugeBundle;
+var folder = AssetsFolderType.Extensions;
+var useLibrary = LibraryProcessType.Both;
 
 string assetsFolder = folder switch
 {
     AssetsFolderType.Extensions => "Assets/Extensions",
     AssetsFolderType.HugeBundle => "Assets/HugeBundle",
+    AssetsFolderType.HugeDocument => "Assets/HugeDocument",
     _ => throw new NotImplementedException()
 };
 
 // Create PDF using iText library
 string itextOutputPath = "EmbeddedFiles_iText.pdf";
 Console.WriteLine("Creating PDF using iText library...");
-CreateEmbeddedPdfWithIText(assetsFolder, itextOutputPath);
-Console.WriteLine($"✓ PDF created successfully: {itextOutputPath}\n");
+if (useLibrary == LibraryProcessType.Itext || useLibrary == LibraryProcessType.Both)
+{
+    CreateEmbeddedPdfWithIText(assetsFolder, itextOutputPath);
+    Console.WriteLine($"✓ PDF created successfully: {itextOutputPath}\n");
+}
 
 // Create PDF using Aspose library
 string asposeOutputPath = "EmbeddedFiles_Aspose.pdf";
 Console.WriteLine("Creating PDF using Aspose library...");
-CreateEmbeddedPdfWithAspose(assetsFolder, asposeOutputPath);
-Console.WriteLine($"✓ PDF created successfully: {asposeOutputPath}\n");
+if (useLibrary == LibraryProcessType.Aspose || useLibrary == LibraryProcessType.Both)
+{
+    CreateEmbeddedPdfWithAspose(assetsFolder, asposeOutputPath);
+    Console.WriteLine($"✓ PDF created successfully: {asposeOutputPath}\n");
+}
 
 Console.WriteLine("All PDFs created successfully!");
 
@@ -248,9 +255,6 @@ static void CreateEmbeddedPdfWithAspose(string assetsFolder, string outputPdfPat
         headerCell.DefaultCellTextState.FontStyle = Aspose.Pdf.Text.FontStyles.Bold;
     }
 
-    // Store file specs for annotations
-    var fileAnnotations = new List<(FileSpecification fileSpec, int rowIndex)>();
-
     // Process and embed each file
     int fileIndex = 1;
     
@@ -261,11 +265,13 @@ static void CreateEmbeddedPdfWithAspose(string assetsFolder, string outputPdfPat
         long fileSize = fileInfo.Length;
         string fileSizeFormatted = FormatFileSize(fileSize);
 
-        // Add file to embedded files in PDF
-        FileSpecification fileSpec = new FileSpecification(filePath, fileName);
-        fileSpec.Description = $"Embedded file: {fileName}";
+        // Add file to embedded files in PDF with Zip compression
+        FileSpecification fileSpec = new FileSpecification(filePath, fileName)
+        {
+            Description = $"Embedded file: {fileName}",
+            Encoding = FileEncoding.Zip
+        };
         pdfDoc.EmbeddedFiles.Add(fileSpec);
-        fileAnnotations.Add((fileSpec, fileIndex));
 
         // Add row to table
         Row row = table.Rows.Add();
@@ -273,8 +279,8 @@ static void CreateEmbeddedPdfWithAspose(string assetsFolder, string outputPdfPat
         row.Cells.Add(fileName);
         row.Cells.Add(fileSizeFormatted);
         
-        // Add "📎 Open" text in the action column
-        Aspose.Pdf.Cell actionCell = row.Cells.Add("📎 Open");
+        // Add "📎 Attached" indicator in the status column
+        Aspose.Pdf.Cell actionCell = row.Cells.Add("📎 Attached");
         actionCell.DefaultCellTextState.ForegroundColor = Aspose.Pdf.Color.Blue;
 
         Console.WriteLine($"  Embedded: {fileName} ({fileSizeFormatted})");
@@ -283,31 +289,11 @@ static void CreateEmbeddedPdfWithAspose(string assetsFolder, string outputPdfPat
 
     page.Paragraphs.Add(table);
 
-    // Add file attachment annotations for each file
-    // Position them in the "Open" column for each row
-    double startY = 630; // Starting Y position for first row
-    double rowHeight = 22; // Height between rows
-    double annotX = 470; // X position for annotations (Open column)
-    double annotWidth = 80; // Width of annotation area
-    
-    foreach (var (fileSpec, rowIndex) in fileAnnotations)
-    {
-        double yPos = startY - ((rowIndex - 1) * rowHeight);
-        Aspose.Pdf.Rectangle annotRect = new Aspose.Pdf.Rectangle(annotX, yPos - 5, annotX + annotWidth, yPos + 10);
-        
-        FileAttachmentAnnotation fileAttachment = new FileAttachmentAnnotation(page, annotRect, fileSpec);
-        fileAttachment.Icon = FileIcon.Paperclip;
-        fileAttachment.Color = Aspose.Pdf.Color.Blue;
-        fileAttachment.Contents = $"Click to open attachment";
-        
-        page.Annotations.Add(fileAttachment);
-    }
-
     // Add spacing
     page.Paragraphs.Add(new TextFragment(" "));
 
     // Add instruction note
-    TextFragment instructionNote = new TextFragment("💡 Click on the paperclip icons in the 'Open' column to access files, or use your PDF viewer's attachment panel (View → Attachments).");
+    TextFragment instructionNote = new TextFragment("💡 Access files via your PDF viewer's attachment panel (View → Attachments or side panel).");
     instructionNote.TextState.FontSize = 10;
     instructionNote.TextState.ForegroundColor = Aspose.Pdf.Color.Blue;
     page.Paragraphs.Add(instructionNote);
@@ -321,6 +307,17 @@ static void CreateEmbeddedPdfWithAspose(string assetsFolder, string outputPdfPat
     footer.TextState.FontStyle = Aspose.Pdf.Text.FontStyles.Italic;
     footer.HorizontalAlignment = Aspose.Pdf.HorizontalAlignment.Center;
     page.Paragraphs.Add(footer);
+
+    // Optimize document and compress streams
+    var optimizationOptions = new Aspose.Pdf.Optimization.OptimizationOptions
+    {
+        CompressObjects = true,
+        RemoveUnusedStreams = true,
+        RemoveUnusedObjects = true,
+        LinkDuplicateStreams = true,
+        AllowReusePageContent = true
+    };
+    pdfDoc.OptimizeResources(optimizationOptions);
 
     // Save the document
     pdfDoc.Save(outputPdfPath);

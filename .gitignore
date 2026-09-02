@@ -449,3 +449,4 @@ files/
 files/*
 
 Assets/HugeBundle/**
+Assets/HugeDocument/**
